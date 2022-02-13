@@ -73,7 +73,7 @@ for BATCH_SIZE in [512, 1024, 2048, 4096]:
                                                 inp_clip,
                                                 grad_clip
                                             )
-                    tl, correct, set_len = test(model, test_loader)
+                    tl, correct, set_len = uc.test(model, test_loader)
                     print(f'MNIST_{BATCH_SIZE}_{epochs}_{grad_clip}_{inp_clip}_{rho_i}', correct/set_len)
                     pickle.dump((info, tl, correct), open(f'MNIST_{BATCH_SIZE}_{epochs}_{grad_clip}_{inp_clip}_{rho_i}.p', 'wb'))
                 
