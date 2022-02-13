@@ -127,16 +127,19 @@ def run_experiment(model, train_loader, rho_i, epochs, input_bound, grad_bound):
             for p in model.parameters():
                 with torch.no_grad():
                     p.grad += sigma * torch.randn(p.shape).to('cuda')
-                    total_rho += rho_i
 
             norms.append(next(model.parameters()).data.norm())
 
             model_optimizer.step()
+    
             
 
     total_weights = 0
     for p in model.parameters():
+        total_rho += rho_i
         total_weights += p.flatten().shape[0]
+
+    total_rho *= epochs
 
     info = {'sens': sensitivities,
             'norms': norms,
