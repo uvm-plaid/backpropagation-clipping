@@ -110,7 +110,7 @@ def run_experiment(model, train_loader, rho_i, epochs, input_bound, grad_bound):
     
     model.train()
     # sensitivity for everything with weights is just:
-    sensitivity = input_bound * grad_bound / train_loader.batch_size
+    sensitivity = input_bound * grad_bound
     sigma = np.sqrt(sensitivity**2 / (2*rho_i))
     print('sensitivity:', sensitivity)
     

@@ -71,7 +71,7 @@ for BATCH_SIZE in [512, 1024, 2048, 4096]:
                                                 rho_i,
                                                 epochs,
                                                 inp_clip,
-                                                grad_clip
+                                                grad_clip/BATCH_SIZE
                                             )
                     tl, correct, set_len = uc.test(model, test_loader)
                     print(f'MNIST_{BATCH_SIZE}_{epochs}_{grad_clip}_{inp_clip}_{rho_i}', correct/set_len)
