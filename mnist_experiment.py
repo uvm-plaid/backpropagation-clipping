@@ -60,38 +60,27 @@ class Classifier(nn.Module):
 
 # CONFIGURATIONS
 # delta is fixed to 10e-5
-
-# EPSILON = 1 configuration
-# reaches ~95% accuracy
+# decent hyperparameters for all configurations:
 batches = [256]
 epochses = [5]
 grad_clips = [1e-7]
 inp_clips = [3]
-epsilons = [1]
 
 # EPSILON = 3 configuration
 # reaches ~96% accuracy
-batches = [256]
-epochses = [5]
-grad_clips = [1e-7]
-inp_clips = [3]
 epsilons = [3]
 
-# EPSILON = 0.1 configuration
-# reaches ~79% accuracy
-batches = [256]
-epochses = [5]
-grad_clips = [1e-7]
-inp_clips = [3]
-epsilons = [0.1]
+# EPSILON = 1 configuration
+# reaches ~95% accuracy
+epsilons = [1]
 
 # EPSILON = 0.2 configuration
 # reaches ~87% accuracy
-batches = [256]
-epochses = [5]
-grad_clips = [1e-7]
-inp_clips = [3]
 epsilons = [0.2]
+
+# EPSILON = 0.1 configuration
+# reaches ~79% accuracy
+epsilons = [0.1]
 
 for BATCH_SIZE, epochs, grad_clip, inp_clip, target_eps \
     in itertools.product(batches, epochses, grad_clips, inp_clips, epsilons):
