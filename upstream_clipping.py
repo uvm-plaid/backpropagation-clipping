@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.autograd import Variable
+import gdp
 
 import time
 
@@ -75,46 +76,67 @@ def get_clamp_func(norm, bound):
     
     
 
-def zcdp_eps(rho, delta):
-    return rho + 2*np.sqrt(rho*np.log(1/delta))
-
-
-def run_experiment(model, train_loader, rho_i, epochs, input_bound, grad_bound):
+def run_experiment(model, train_loader, target_eps, epochs,
+                   input_bound, grad_bound,
+                   batch_size,
+                   test_loader, clip=True):
     model.to('cuda')
-    #model.network.to('cuda')
     model_criterion = nn.NLLLoss()
-    model_optimizer = optim.Adam(model.parameters(), lr=0.01)#, weight_decay=0.0001)
-    total_rho = 0
+    model_optimizer = optim.Adam(model.parameters(), lr=0.01)
+
+    ##################################################
+    # Register clipping hooks
+    ##################################################
+    if clip:
+        clamp_grad_lweird = get_clamp_func('lweird', grad_bound)
+        clamp_grad_l2 = get_clamp_func('l2', grad_bound)
+        clamp_input = get_clamp_func('input', input_bound)
     
-    clamp_grad_lweird = get_clamp_func('lweird', grad_bound)
-    clamp_grad_l2 = get_clamp_func('l2', grad_bound)
-    clamp_input = get_clamp_func('input', input_bound)
-    
-    for x in model.l1_clip:
-        x.register_backward_hook(clamp_grad_lweird)
-    for x in model.l2_clip:
-        x.register_backward_hook(clamp_grad_l2)
-    for x in model.input_clip:
-        x.register_forward_pre_hook(clamp_input)
+        for x in model.l1_clip:
+            x.register_backward_hook(clamp_grad_lweird)
+        for x in model.l2_clip:
+            x.register_backward_hook(clamp_grad_l2)
+        for x in model.input_clip:
+            x.register_forward_pre_hook(clamp_input)
     
     for x in model.network:
         x.input_maxes = []
         x.grad_maxes = []
-#         x.register_backward_hook(clamp_grad)
-#         x.register_forward_pre_hook(clamp_input)
     
     sensitivities = []
     norms = []
-    decays = []
     losses = []
     
     model.train()
+
+    ##################################################
+    # COMPUTE PRIVACY PARAMETERS
+    ##################################################
     # sensitivity for everything with weights is just:
     sensitivity = input_bound * grad_bound
-    sigma = np.sqrt(sensitivity**2 / (2*rho_i))
-    print('sensitivity:', sensitivity)
-    
+
+    # total steps: product of
+    #  - number of batches in the data loader
+    #  - number of epochs
+    #  - number of layers with trainable weights
+    dataset_size = len(train_loader.dataset)
+    trainable_layers = len(list(model.parameters()))
+    total_steps = int(dataset_size/batch_size)* epochs * trainable_layers
+    sampling_rate = batch_size/dataset_size
+
+    noise_mult, actual_eps = gdp.compute_noise_target_eps(total_steps, sampling_rate,
+                                                          target_eps, 1e-5)
+
+    sigma = sensitivity * noise_mult
+
+
+    ##################################################
+    # TRAINING LOOP
+    ##################################################
     for epoch in range(epochs):
+        # tl, correct, set_len = test(model, test_loader)
+        # print(f'epoch {epoch} accuracy:', correct/set_len)
+        
         for x_batch_train, y_batch_train in train_loader:
             xb = x_batch_train.to('cuda')
             yb = y_batch_train.to('cuda')
@@ -123,7 +145,7 @@ def run_experiment(model, train_loader, rho_i, epochs, input_bound, grad_bound):
             loss = model_criterion(outputs, yb)
             losses.append(loss)
             loss.backward()
-            
+           
             for p in model.parameters():
                 with torch.no_grad():
                     p.grad += sigma * torch.randn(p.shape).to('cuda')
@@ -131,23 +153,11 @@ def run_experiment(model, train_loader, rho_i, epochs, input_bound, grad_bound):
             norms.append(next(model.parameters()).data.norm())
 
             model_optimizer.step()
-    
             
-
-    total_weights = 0
-    for p in model.parameters():
-        total_rho += rho_i
-        total_weights += p.flatten().shape[0]
-
-    total_rho *= epochs
-
     info = {'sens': sensitivities,
             'norms': norms,
-            'decays': decays,
             'losses': losses,
-            'total rho': total_rho,
-            'total epsilon':zcdp_eps(total_rho, 1e-5),
-            'total weights': total_weights}
+            'total epsilon': actual_eps}
 
     return model, info
 
